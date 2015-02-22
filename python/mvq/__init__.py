@@ -16,6 +16,7 @@ path = os.path.dirname(os.path.realpath(__file__))
 data_path = os.path.join(os.path.dirname(os.path.dirname(path)), 'data')
 images_path = os.path.join(data_path, 'images')
 videos_path = os.path.join(data_path, 'videos')
+stereo_path = os.path.join(data_path, 'Stereo')
 
 # Set up logging
 import logging
