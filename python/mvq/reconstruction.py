@@ -74,7 +74,7 @@ def find_vanishing_point(img):
 
     # Calculate hough lines
     # lines = cv2.HoughLines(image=filtered_img, rho=10, theta=np.pi*10/360, threshold=140, srn=10, stn=10)
-    lines = cv2.HoughLinesP(image=filtered_img, rho=1, theta=np.pi*1/180, threshold=80, minLineLength=170, maxLineGap=120)
+    lines = cv2.HoughLinesP(image=filtered_img, rho=1, theta=np.pi*1/180, threshold=10, minLineLength=170, maxLineGap=120)
 
     if lines is None:
         lines = []
@@ -83,11 +83,18 @@ def find_vanishing_point(img):
     img_copy = np.array(img)
     img_copy = cv2.cvtColor(img_copy, cv2.COLOR_GRAY2BGR)
 
+    lines = [line[0] for line in lines]
+
     for line in lines:
-        x1, y1, x2, y2 = line[0]
+        x1, y1, x2, y2 = line
         p1 = (x1, y1)
         p2 = (x2, y2)
         cv2.line(img_copy, p1, p2, (255, 255, 0), 2)
+
+    vanishing_point = ransac_vanishing_point_detection(lines,5,200)
+
+    cv2.circle(img_copy, vanishing_point, 1, (255, 0, 255), 8)
+
 
     # Draw the hough lines
     # for line in lines:
@@ -116,6 +123,60 @@ def find_vanishing_point(img):
 
     # TODO: find and return the vanishing point
     return -1, -1
+
+
+def ransac_vanishing_point_detection(lines, distance, iterations):
+    """
+    Calculate the vanishing point of the road markers.
+
+    :param lines: the lines defined as a [x1, y1, x2, y2] (4xN array, where N is the number of lines)
+    :param distance: the distance (in pixels) to determine if a measurement is consistent
+    :param iterations: the number of RANSAC iterations to use
+    :return: Coordinates of the road vanishing point
+    """
+
+    N = np.size(lines,0)
+
+    # Creating the place to store the maximum number of consistant lines
+    max_num_consistent_lines = 0
+
+    # Looping through all of the iterations to find the most consistent value
+    for i in range(0,N):
+        # Randomly choosing the lines
+        random_indices = np.random.choice(N, 2, replace=False)
+        i1 = random_indices[0]
+        i2 = random_indices[1]
+        x1, y1, x2, y2 = lines[i1]
+        x3, y3, x4, y4 = lines[i2]
+
+        # Find the intersection point
+        x_intersect = ( (x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4) )/( (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4) )
+        y_intersect = ( (x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4) )/( (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4) )
+
+        this_num_consistent = 0;
+        # Find the distance between the intersection and all of the other lines
+        for i2 in range(0,N):
+            tx1, ty1, tx2, ty2 = lines[i2]
+            this_distance = np.abs( (ty2-ty1)*x_intersect - (tx2-tx1)*y_intersect + tx2*ty1 - ty2*tx1 )/np.sqrt( (ty2-ty1)**2 +(tx2-tx1)**2 )
+            if( this_distance < distance ):
+                this_num_consistent += 1
+
+        # If it's greater, make this the new x, y intersect
+        if (this_num_consistent > max_num_consistent_lines):
+            best_fit_x = x_intersect
+            best_fit_y = y_intersect
+            max_num_consistent_lines = this_num_consistent
+
+        best_fit_x = int(best_fit_x)
+        best_fit_y = int(best_fit_y)
+
+
+    return (best_fit_x, best_fit_y)
+
+
+
+
+
 
 # This part is run when the script is executed, but not imported
 if __name__ == '__main__':
