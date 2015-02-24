@@ -48,8 +48,9 @@ def plot_disparity_map(img_left, img_right, disparity_map):
     # Plot
     plt.figure()
     plt.subplot(211), plt.imshow(cv2.cvtColor(img_left, cv2.COLOR_BGR2RGB))
-    plt.title('Input image (left) vs stereo disparity map')
+    plt.title('Left camera view')
     plt.subplot(212), plt.imshow(disparity_map, 'gray')
+    plt.title('Calculated disparity map')
 
 # This part is run when the script is executed, but not imported
 if __name__ == '__main__':

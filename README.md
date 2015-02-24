@@ -43,32 +43,30 @@ located at `python/notebooks/lane_detection.ipynb` and can be viewed online at
 [nbviewer](http://nbviewer.ipython.org/github/hmartiro/project-mvq/blob/master/python/notebooks/lane_detection.ipynb).
 
 #### Stereo disparity map
-Getting a depth map of the scene from the stereo cameras is extremely useful
+Calculating a depth map of the scene from the stereo cameras is extremely useful
 for understanding, because we can draw conclusions about how important various
 features are by their distance from the vehicle. We can tie this depth data
 with recognition methods to identify features.
 
 #### Image segmentation
 Segmenting the image into known regions provides an easy way to enable variable
-compression. If we can detect regions of sky/grass/tree/asphalt, we can easily
-make decisions about what is important. One method for this is to use a bank
-of known textures that are matched against the image.
+compression. These objects might include the sky, road, grass, median, trees, buildings,
+etc. Based on the object classification, we could determine the compression
+level and frame rate that different portions of the video need to be transmitted at.
 
 #### Feature recognition
 More advanced feature detection for entities like vehicles, pedestrians, and
-animals would highlight key areas to pay attention to. This could enables the
-transfer of object metadata instead of pixel data, that is reconstructed at
-the remote driver. Alternatively, it could enable augmented reality features
-where the stream is enhanced to provide helpful warnings to the remote driver.
+animals would highlight key areas to pay attention to. This could potentially
+enable transmission of feature metadata instead of pixel data, to be reconstructed
+in the form of augmented reality for the remote driver.
 
-#### Visual odometry
+#### Visual flow
 Going beyond single-image methods, investigating the temporal differences of the
 images in the stream can tell us information about the movement of objects. We
 could say, for example, that objects moving quickly across the screen are extremely
-important to watch for. We could also enable smarter compression by only sending
-significant changes between the frames of the stream.
+important to watch for.
 
 #### Edge detection
-General edge detection can be important for compression. In general, regions of
-the stream without significant edges are much less likely to be important to
-transmit in high-resolution.
+General edge detection can be important for compression, with minimal required
+knowledge of the scene. In general, regions of the stream without significant
+edges are much less likely to be important to transmit in high-resolution.
