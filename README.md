@@ -24,3 +24,9 @@ Run the code from any directory as modules. For example, to run
 `project-mvq/python/mvq/reconstruction.py`, use:
 
     python -m mvq.reconstruction
+
+## Lane detection tutorial
+We have created a tutorial for lane detection as an IPython notebook. The notebook
+is at `python/notebooks/lane_detection.ipynb` and can be viewed online using
+[nbviewer](http://nbviewer.ipython.org/github/hmartiro/project-mvq/blob/master/python/notebooks/lane_detection.ipynb).
+
