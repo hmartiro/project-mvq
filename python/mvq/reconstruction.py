@@ -1,5 +1,5 @@
 """
-Attempts at 3D scene reconstruction from a vehicle stereo camera pair.
+Vanishing point and line marker estimation from a single camera image.
 
 """
 
@@ -57,7 +57,7 @@ def find_vanishing_point(img):
     vanishing_point = ransac_vanishing_point_detection(lines, 5, 20)
 
     # Plot the vanishing point
-    cv2.circle(img_copy, vanishing_point, 1, (255, 0, 0), 8)
+    cv2.circle(img_copy, vanishing_point, 1, (255, 0, 0), 20)
 
     # Plot
     plt.figure()

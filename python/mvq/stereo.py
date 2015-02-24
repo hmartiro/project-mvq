@@ -1,5 +1,5 @@
 """
-Attempts at 3D scene reconstruction from a vehicle stereo camera pair.
+Disparity map calculation from the vehicle stereo camera pair.
 
 """
 
