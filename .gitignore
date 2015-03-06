@@ -59,3 +59,6 @@ target/
 # IPython
 .ipynb_checkpoints/
 
+# Large data sets
+data/kitti
+
