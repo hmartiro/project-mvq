@@ -66,6 +66,23 @@ def find_vanishing_point(img):
     plt.subplot(212), plt.imshow(filtered_img, 'gray')
     plt.title('Lane marker detection filter')
 
+    return vanishing_point
+
+
+def find_holy_triangle(img, left_x, right_x):
+    vanishing_point = find_vanishing_point(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY))
+
+    max_y = img.shape[0]
+
+    out_im = np.zeros( (img.shape[0], img.shape[1]) )
+    for y in range(img.shape[0]):
+        for x in range(img.shape[1]):
+            left_line1 = (np.sign( (vanishing_point[0]-right_x)*(y-max_y) - (vanishing_point[1]-max_y)*(x-right_x) ) == -1) # left of line 1
+            right_line2 = (np.sign( (vanishing_point[0]-left_x)*(y-max_y) - (vanishing_point[1]-max_y)*(x-left_x) ) == 1) # right of line 2
+            if (left_line1 & right_line2):
+                out_im[y,x] = 1.0
+
+    return out_im
 
 # This part is run when the script is executed, but not imported
 if __name__ == '__main__':

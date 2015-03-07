@@ -8,6 +8,8 @@ import numpy as np
 import math
 import cv2
 from mvq import stereo_path
+from mvq import reconstruction
+from PIL import Image
 
 
 def quantize_bit_shift(img, shift_r, shift_g, shift_b):
@@ -96,12 +98,36 @@ def quantize_kmeans(img, num_colors):
     return img, gray_labels
 
 
+def quantize_find_palette(img, weights, num_colors):
+
+    random_values = np.random.rand(weights.shape[0],weights.shape[1])
+    random_indices = random_values > weights
+
+    img_random = img.copy()
+    img_random[random_indices,:] = 0
+
+    i = Image.fromarray(img_random.copy())
+    i = i.quantize(colors=num_colors,method=0)
+
+    return i
+
+def quantize_from_palette(img, palette_im):
+    out_im = Image.fromarray(img.copy())
+    out_im = out_im.quantize(palette=palette_im).convert("RGB")
+
+    return np.asarray(out_im)
+
+
+
 def process(img_left, img_right):
 
     img = img_left[:, :]
 
-    img, gray_labels = quantize_kmeans(img, num_colors=256)
+    # img, gray_labels = quantize_kmeans(img, num_colors=256)
     # img = quantize_bit_shift(img, 3, 3, 3)
+    weightings = reconstruction.find_holy_triangle(img, -100, 850) + 0.02
+    found_palette = quantize_find_palette(img, weightings, 20)
+    img = quantize_from_palette(img, found_palette)
 
     return img
 
