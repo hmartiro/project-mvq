@@ -7,9 +7,14 @@ import time
 import numpy as np
 import math
 import cv2
-from mvq import stereo_path
-from mvq import reconstruction
+from matplotlib import pyplot as plt
 from PIL import Image
+from mvq.external.oclcq import quantize_image, colour_quantization
+from mvq.stereo import calculate_disparity_map
+from mvq.stereo import plot_disparity_map
+
+from mvq import kitti_path
+from mvq import reconstruction
 
 
 def quantize_bit_shift(img, shift_r, shift_g, shift_b):
@@ -100,33 +105,102 @@ def quantize_kmeans(img, num_colors):
 
 def quantize_find_palette(img, weights, num_colors):
 
-    random_values = np.random.rand(weights.shape[0],weights.shape[1])
+    random_values = np.random.rand(weights.shape[0], weights.shape[1])
     random_indices = random_values > weights
 
     img_random = img.copy()
-    img_random[random_indices,:] = 0
+    img_random[random_indices, :] = 0
 
-    i = Image.fromarray(img_random.copy())
-    i = i.quantize(colors=num_colors,method=0)
+    # Add bright colors
+    augmented = np.zeros([img_random.shape[0], img_random.shape[1] + 50, img_random.shape[2]], dtype=np.uint8)
+    augmented[:, :, 2] = 255
+    augmented[:, :-50, :] = img_random
+
+    augmented2 = np.zeros([augmented.shape[0], augmented.shape[1] + 50, augmented.shape[2]], dtype=np.uint8)
+    augmented2[:, :, 0] = 250
+    augmented2[:, :, 1] = 250
+    augmented2[:, :, 2] = 180
+    augmented2[:, :-50, :] = augmented
+
+    i = Image.fromarray(augmented2)
+
+    i = i.quantize(colors=num_colors, method=0)
 
     return i
 
-def quantize_from_palette(img, palette_im):
-    out_im = Image.fromarray(img.copy())
-    out_im = out_im.quantize(palette=palette_im).convert("RGB")
 
-    return np.asarray(out_im)
+def quantize_from_palette(img, palette):
 
+    scale = 5
+    out_im = cv2.resize(img, (img.shape[1]*scale, img.shape[0]*scale), interpolation=cv2.INTER_NEAREST)
+
+    out_im = Image.fromarray(out_im)
+    out_im = out_im.quantize(method=0, palette=palette).convert("RGB")
+    out_im = np.asarray(out_im)
+
+    out_im = cv2.medianBlur(out_im, 3)
+
+    out_im = cv2.resize(out_im, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+    return out_im
+
+
+def combine_weights(W_list):
+
+    W = np.zeros([W_list[0].shape[0], W_list[0].shape[1], len(W_list)])
+
+    for i in range(len(W_list)):
+        W[:, :, i] = W_list[i]
+
+    W = np.max(W, axis=2)
+
+    return W
+
+
+def calculate_global_weight_matrix(img_left, img_right):
+
+    W = np.zeros((img_left.shape[1], img_left.shape[0]))
+
+    W_triangle = reconstruction.find_holy_triangle(img_left, -100, 850) + 0.02
+    W_triangle = cv2.GaussianBlur(W_triangle, (101, 101), 0)
+
+    W_disparity = calculate_disparity_map(img_left, img_right)
+    W_disparity = cv2.GaussianBlur(W_disparity, (21, 21), 0)
+    W_disparity_smoothed = cv2.GaussianBlur(W_disparity, (101, 101), 0)
+    W_disparity = combine_weights([W_disparity, W_disparity_smoothed])
+    W_disparity = cv2.GaussianBlur(W_disparity, (21, 21), 0)
+    W_disparity = W_disparity / np.max(W_disparity)
+
+    W = combine_weights([W_triangle, W_disparity])
+
+    plt.figure()
+    plt.subplot(311), plt.imshow(W_triangle, vmin=0, vmax=1)
+    plt.title('W_triangle')
+    plt.subplot(312), plt.imshow(W_disparity, vmin=0, vmax=1)
+    plt.title('W_disparity')
+    plt.subplot(313), plt.imshow(W, vmin=0, vmax=1)
+    plt.title('W')
+
+    return W
 
 
 def process(img_left, img_right):
 
-    img = img_left[:, :]
+    W = calculate_global_weight_matrix(img_left, img_right)
 
-    # img, gray_labels = quantize_kmeans(img, num_colors=256)
+    img = img_left.copy()
+
+    smoothed_img = cv2.GaussianBlur(img, (11, 11), 0)
+    img[:, :, 0] = W * img[:, :, 0] + (1 - W) * smoothed_img[:, :, 0]
+    img[:, :, 1] = W * img[:, :, 1] + (1 - W) * smoothed_img[:, :, 1]
+    img[:, :, 2] = W * img[:, :, 2] + (1 - W) * smoothed_img[:, :, 2]
+
+    img = cv2.bilateralFilter(img, 40, 75, 75)
+
+    # img, gray_labels = quantize_kmeans(img, num_colors=20)
     # img = quantize_bit_shift(img, 3, 3, 3)
-    weightings = reconstruction.find_holy_triangle(img, -100, 850) + 0.02
-    found_palette = quantize_find_palette(img, weightings, 20)
+
+    found_palette = quantize_find_palette(img, W, 15)
     img = quantize_from_palette(img, found_palette)
 
     return img
@@ -134,9 +208,11 @@ def process(img_left, img_right):
 
 def main(show=False):
 
+    from pathlib import Path
+
     # Get paths to stereo images
-    left_path = os.path.join(stereo_path, 'Color_cam1', '0000000000.png')
-    right_path = os.path.join(stereo_path, 'Color_cam2', '0000000000.png')
+    left_path = str(Path(kitti_path) / 'left' / '0000000222.png')
+    right_path = str(Path(kitti_path) / 'right' / '0000000222.png')
 
     # Read in stereo images
     print('Reading left image from "{}"'.format(left_path))
@@ -157,41 +233,50 @@ def main(show=False):
     img_out = process(img_left, img_right)
 
     # Save the data as an array
-    import pickle
-    import zlib
-    data_path = left_path[:-4] + '_data.out'
-    with open(data_path, 'wb') as f:
-
-        data = pickle.dumps(img_out)
-        data = zlib.compress(data)
-        f.write(data)
+    # import pickle
+    # import zlib
+    # data_path = left_path[:-4] + '_data.out'
+    # with open(data_path, 'wb') as f:
+    #
+    #     data = pickle.dumps(img_out)
+    #     data = zlib.compress(data)
+    #     f.write(data)
 
     # Save the output image
     out_path = left_path[:-4] + '_out.png'
     print('')
     print('Saving output image to "{}"'.format(out_path))
     cv2.imwrite(out_path, img_out, params=(
-        # cv2.IMWRITE_PNG_COMPRESSION, 9,
-        # cv2.IMWRITE_PNG_STRATEGY, cv2.IMWRITE_PNG_STRATEGY_FILTERED,
+        cv2.IMWRITE_PNG_COMPRESSION, 9,
+        cv2.IMWRITE_PNG_STRATEGY, cv2.IMWRITE_PNG_STRATEGY_FILTERED,
         # cv2.IMWRITE_PNG_BILEVEL, True
+    ))
+    jpg_out_path = left_path[:-4] + '_out.jpg'
+    cv2.imwrite(jpg_out_path, img_out, params=(
+        # cv2.IMWRITE_JPEG_QUALITY,
     ))
 
     # Show the output image
     if show:
-        cv2.imshow('image', img_out)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        plt.figure()
+        plt.subplot(211), plt.imshow(cv2.cvtColor(img_left, cv2.COLOR_BGR2RGB))
+        plt.title('Original')
+        plt.subplot(212), plt.imshow(cv2.cvtColor(img_out, cv2.COLOR_BGR2RGB))
+        plt.title('Compressed')
+        plt.show()
 
     # Compute the compression
     in_size = os.stat(in_path).st_size
     out_size = os.stat(out_path).st_size
-    data_file_size = os.stat(data_path).st_size
+    jpg_out_size = os.stat(jpg_out_path).st_size
+    # data_file_size = os.stat(data_path).st_size
     compression_ratio = out_size / in_size
 
     print('')
     print('Input file size: {} bytes'.format(in_size))
-    print('Output file size: {} bytes'.format(out_size))
-    print('Data file size: {} bytes'.format(data_file_size))
+    print('PNG Output file size: {} bytes'.format(out_size))
+    print('JPG Output file size: {} bytes'.format(jpg_out_size))
+    # print('Data file size: {} bytes'.format(data_file_size))
     print('Compression ratio: {}'.format(compression_ratio))
 
 

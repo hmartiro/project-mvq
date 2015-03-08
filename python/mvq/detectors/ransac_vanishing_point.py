@@ -38,6 +38,9 @@ def ransac_vanishing_point_detection(lines, distance=50, iterations=100):
         x_intersect = ((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-(y1-y2)*(x3-x4))
         y_intersect = ((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/((x1-x2)*(y3-y4)-(y1-y2)*(x3-x4))
 
+        if y_intersect < 80 or y_intersect > 300:
+            continue
+
         this_num_consistent_lines = 0
 
         # Find the distance between the intersection and all of the other lines

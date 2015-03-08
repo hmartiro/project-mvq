@@ -23,7 +23,7 @@ def find_vanishing_point(img):
     """
 
     # Filter to find the lane markers
-    filtered_img = lane_marker_filter(img, tau=15)
+    filtered_img = lane_marker_filter(img, tau=10)
 
     # Erode the smaller features away, make lane lines thinner
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -35,8 +35,8 @@ def find_vanishing_point(img):
         rho=1,
         theta=np.pi*1/180,
         threshold=10,
-        minLineLength=170,
-        maxLineGap=120
+        minLineLength=120,
+        maxLineGap=80
     )
 
     if lines is None:
@@ -55,6 +55,7 @@ def find_vanishing_point(img):
         cv2.line(img_copy, p1, p2, (255, 255, 0), 2)
 
     vanishing_point = ransac_vanishing_point_detection(lines, 5, 20)
+    print(vanishing_point)
 
     # Plot the vanishing point
     cv2.circle(img_copy, vanishing_point, 1, (255, 0, 0), 20)
