@@ -184,17 +184,28 @@ def calculate_global_weight_matrix(img_left, img_right):
     return W
 
 
-def process_block(img, weight):
+def process_block(img, weight, quality):
 
-    N = img.shape[0]
+    chroma_quality = np.mean(weight) * quality
+    print(chroma_quality)
 
-    avg = cv2.mean(img)
+    chroma_quality = int(chroma_quality)
+    if chroma_quality < 1:
+        chroma_quality = 1
 
-    img[:, :, 0] = avg[0]
-    img[:, :, 1] = avg[1]
-    img[:, :, 2] = avg[2]
+    luma_quality = chroma_quality + 1
 
+    jpg_out_path = 'tmp.jpg'
+    cv2.imwrite(jpg_out_path, img, params=(
+        cv2.IMWRITE_JPEG_OPTIMIZE, 1,
+        cv2.IMWRITE_JPEG_LUMA_QUALITY, luma_quality,
+        cv2.IMWRITE_JPEG_CHROMA_QUALITY, chroma_quality,
+        # cv2.IMWRITE_JPEG_QUALITY, 100,
+        # cv2.IMWRITE_JPEG_PROGRESSIVE, 1
+        # cv2.IMWRITE_JPEG_RST_INTERVAL, 100
+    ))
 
+    img = cv2.imread(jpg_out_path, cv2.IMREAD_ANYCOLOR)
     return img
 
 
@@ -214,14 +225,16 @@ def process(img_left, img_right):
             y2 = (i+1) * block_size
             x2 = (j+1) * block_size
 
+            print('Block {})'.format((i, j)))
+
             if y2 > img.shape[0]:
                 y2 = img.shape[0]
             if x2 > img.shape[1]:
                 x2 = img.shape[1]
 
-            # block = process_block(img[y1:y2, x1:x2, :], W[y1:y2, x1:x2])
+            block = process_block(img[y1:y2, x1:x2, :], W[y1:y2, x1:x2], quality=10)
 
-            # img[y1:y2, x1:x2, :] = block
+            img[y1:y2, x1:x2, :] = block
 
     img = img[0:int(img.shape[0]/block_size)*block_size, 0:int(img.shape[1]/block_size)*block_size, :]
     print(img.shape)
@@ -290,7 +303,7 @@ def main(show=False):
     cv2.imwrite(jpg_out_path, img_out, params=(
         cv2.IMWRITE_JPEG_OPTIMIZE, 1,
         cv2.IMWRITE_JPEG_LUMA_QUALITY, 11,
-        cv2.IMWRITE_JPEG_CHROMA_QUALITY, 5,
+        cv2.IMWRITE_JPEG_CHROMA_QUALITY, 10,
         # cv2.IMWRITE_JPEG_QUALITY, 100,
         # cv2.IMWRITE_JPEG_PROGRESSIVE, 1
         # cv2.IMWRITE_JPEG_RST_INTERVAL, 100
