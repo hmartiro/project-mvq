@@ -184,24 +184,59 @@ def calculate_global_weight_matrix(img_left, img_right):
     return W
 
 
+def process_block(img, weight):
+
+    N = img.shape[0]
+
+    avg = cv2.mean(img)
+
+    img[:, :, 0] = avg[0]
+    img[:, :, 1] = avg[1]
+    img[:, :, 2] = avg[2]
+
+
+    return img
+
+
 def process(img_left, img_right):
 
     W = calculate_global_weight_matrix(img_left, img_right)
 
     img = img_left.copy()
 
-    smoothed_img = cv2.GaussianBlur(img, (11, 11), 0)
-    img[:, :, 0] = W * img[:, :, 0] + (1 - W) * smoothed_img[:, :, 0]
-    img[:, :, 1] = W * img[:, :, 1] + (1 - W) * smoothed_img[:, :, 1]
-    img[:, :, 2] = W * img[:, :, 2] + (1 - W) * smoothed_img[:, :, 2]
+    block_size = 8
+    for i in range(int(img.shape[0]/block_size) + 1):
+        for j in range(int(img.shape[1]/block_size) + 1):
 
-    img = cv2.bilateralFilter(img, 40, 75, 75)
+            y1 = i * block_size
+            x1 = j * block_size
+
+            y2 = (i+1) * block_size
+            x2 = (j+1) * block_size
+
+            if y2 > img.shape[0]:
+                y2 = img.shape[0]
+            if x2 > img.shape[1]:
+                x2 = img.shape[1]
+
+            # block = process_block(img[y1:y2, x1:x2, :], W[y1:y2, x1:x2])
+
+            # img[y1:y2, x1:x2, :] = block
+
+    img = img[0:int(img.shape[0]/block_size)*block_size, 0:int(img.shape[1]/block_size)*block_size, :]
+    print(img.shape)
+    # smoothed_img = cv2.GaussianBlur(img, (5, 5), 0)
+    # img[:, :, 0] = W * img[:, :, 0] + (1 - W) * smoothed_img[:, :, 0]
+    # img[:, :, 1] = W * img[:, :, 1] + (1 - W) * smoothed_img[:, :, 1]
+    # img[:, :, 2] = W * img[:, :, 2] + (1 - W) * smoothed_img[:, :, 2]
+    #
+    # img = cv2.bilateralFilter(img, 50, 75, 75)
+    #
+    # found_palette = quantize_find_palette(img, W, 25)
+    # img = quantize_from_palette(img, found_palette)
 
     # img, gray_labels = quantize_kmeans(img, num_colors=20)
     # img = quantize_bit_shift(img, 3, 3, 3)
-
-    found_palette = quantize_find_palette(img, W, 15)
-    img = quantize_from_palette(img, found_palette)
 
     return img
 
@@ -253,7 +288,12 @@ def main(show=False):
     ))
     jpg_out_path = left_path[:-4] + '_out.jpg'
     cv2.imwrite(jpg_out_path, img_out, params=(
-        # cv2.IMWRITE_JPEG_QUALITY,
+        cv2.IMWRITE_JPEG_OPTIMIZE, 1,
+        cv2.IMWRITE_JPEG_LUMA_QUALITY, 11,
+        cv2.IMWRITE_JPEG_CHROMA_QUALITY, 5,
+        # cv2.IMWRITE_JPEG_QUALITY, 100,
+        # cv2.IMWRITE_JPEG_PROGRESSIVE, 1
+        # cv2.IMWRITE_JPEG_RST_INTERVAL, 100
     ))
 
     # Show the output image
