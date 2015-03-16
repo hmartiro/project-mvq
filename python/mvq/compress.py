@@ -12,6 +12,7 @@ from PIL import Image
 # from mvq.external.oclcq import quantize_image, colour_quantization
 from mvq.stereo import calculate_disparity_map
 from mvq.stereo import plot_disparity_map
+from scipy.fftpack import dct, idct
 
 from mvq import kitti_path
 from mvq import reconstruction
@@ -140,9 +141,27 @@ def create_quantization_tables():
     # print(q_luminance_10)
 
 def process_cube(img, weight, quality, q_tables):
-    # CHECK TO MAKE SURE THAT THE SIZE OF IMG, and q_tables are consistent 
-    dct = cv2.dct(img.copy())
-    print(dct)
+    # TODO: check to make sure that size of img, and q_tables are consistent
+
+    this_quality = np.round(np.max(weight)*quality)
+
+    if (this_quality < 0):
+        this_quality = 1
+    if (this_quality > quality - 1):
+        this_quality = quality - 1
+
+    img_dct = dct(dct(dct(np.float32(img.copy()),axis=0),axis=1),axis=2)/4096
+    img_dct = np.floor(img_dct / q_tables[:,:,:,this_quality])
+
+    # print(img_dct)
+
+    img_processed = np.uint8(idct(idct(idct(img_dct*q_tables[:,:,:,this_quality],axis=0),axis=1),axis=2))
+
+    # print(img_processed)
+
+    # print(dct(dct(img,axis=1),axis=0))
+
+    return img_processed
 
 
 
