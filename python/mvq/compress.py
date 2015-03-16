@@ -9,7 +9,7 @@ import math
 import cv2
 from matplotlib import pyplot as plt
 from PIL import Image
-from mvq.external.oclcq import quantize_image, colour_quantization
+# from mvq.external.oclcq import quantize_image, colour_quantization
 from mvq.stereo import calculate_disparity_map
 from mvq.stereo import plot_disparity_map
 
@@ -32,6 +32,119 @@ def quantize_bit_shift(img, shift_r, shift_g, shift_b):
     img[:, :, 2] <<= shift_r
 
     return img
+
+
+def create_quantization_tables():
+
+    q_luminance = np.array([
+    [16, 11, 10, 16, 24, 40, 51, 61],
+    [12, 12, 14, 19, 26, 58, 60, 55],
+    [14, 13, 16, 24, 40, 57, 69, 56],
+    [14, 17, 22, 29, 51, 87, 80, 62],
+    [18, 22, 37, 56, 68, 109, 103, 77],
+    [24, 35, 55, 64, 81, 104, 113, 92],
+    [49, 64, 78, 87, 103, 121, 120, 101],
+    [72, 92, 95, 98, 112, 100, 103, 99]
+    ],np.float32)
+
+    q_chrominance = np.array([
+    [17, 18, 24, 47, 99, 99, 99, 99],
+    [18, 21, 26, 66, 99, 99, 99, 99],
+    [24, 26, 56, 99, 99, 99, 99, 99],
+    [47, 66, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99]
+    ],np.float32)
+
+    q3_luminance = np.zeros((8,8,8,100),np.uint8)
+    q3_chrominance = np.zeros((8,8,8,100),np.uint8)
+
+    for q in range(100):
+        Q = q+1
+        S = 5000/Q if (Q < 50) else 200-2*Q
+
+        # print(Q,S)
+
+        this_q_luminance = ((S*q_luminance+50)/100)
+        this_q_chrominance = ((S*q_chrominance+50)/100)
+
+        this_q_luminance[this_q_luminance > 255] = 255
+        this_q_chrominance[this_q_chrominance > 255] = 255
+
+        this_q_luminance = np.uint8(this_q_luminance)
+        this_q_chrominance = np.uint8(this_q_chrominance)
+
+        this_q3_luminance = np.zeros((8,8,8),np.uint8)
+        this_q3_chrominance = np.zeros((8,8,8),np.uint8)
+
+        this_q3_luminance[:,:,0] = this_q_luminance.copy()
+        this_q3_chrominance[:,:,0] = this_q_chrominance.copy()
+
+        for x in range(8):
+            for y in range(8):
+                for z in range(1,8):
+                    this_q3_luminance[y,x,z] = np.max([this_q_luminance[y,x],this_q_luminance[y,z],this_q_luminance[z,x]])
+                    this_q3_chrominance[y,x,z] = np.max([this_q_chrominance[y,x],this_q_chrominance[y,z],this_q_chrominance[z,x]])
+
+        q3_luminance[:,:,:,q] = this_q3_luminance
+        q3_chrominance[:,:,:,q] = this_q3_chrominance
+
+    # print("80 luminance")
+    # for i in range(8):
+    #     print(q3_luminance[:,:,i,79])
+    # print("80 chrominance")
+    # for i in range(8):
+    #     print(q3_chrominance[:,:,i,79])
+    #
+    # print("50 luminance")
+    # for i in range(8):
+    #     print(q3_luminance[:,:,i,49])
+    # print("50 chrominance")
+    # for i in range(8):
+    #     print(q3_chrominance[:,:,i,49])
+    #
+    # print("10 luminance")
+    # for i in range(8):
+    #     print(q3_luminance[:,:,i,9])
+    # print("10 chrominance")
+    # for i in range(8):
+    #     print(q3_chrominance[:,:,i,9])
+
+
+
+
+
+    # print(q_luminance)
+    # print(q_chrominance)
+    #
+    # Q = 80
+    #
+    # S = 5000/Q if (Q < 50) else 200-2*Q
+    #
+    # print(Q,S)
+    #
+    # q_luminance_80 = np.uint8((S*q_luminance+50)/100)
+    #
+    # print(q_luminance_80)
+    #
+    # Q = 10
+    #
+    # S = 5000/Q if (Q < 50) else 200-2*Q
+    #
+    # print(Q,S)
+    #
+    # q_luminance_10 = np.uint8((S*q_luminance+50)/100)
+    #
+    # print(q_luminance_10)
+
+def process_cube(img, weight, quality, q_tables):
+    # CHECK TO MAKE SURE THAT THE SIZE OF IMG, and q_tables are consistent 
+    dct = cv2.dct(img.copy())
+    print(dct)
+
+
 
 
 def compression_test(img):
