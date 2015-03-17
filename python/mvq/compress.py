@@ -71,6 +71,9 @@ def create_quantization_tables():
         this_q_luminance = ((S*q_luminance+50)/100)
         this_q_chrominance = ((S*q_chrominance+50)/100)
 
+        this_q_luminance[this_q_luminance < 1] = 1
+        this_q_chrominance[this_q_chrominance > 1] = 1
+
         this_q_luminance[this_q_luminance > 255] = 255
         this_q_chrominance[this_q_chrominance > 255] = 255
 
@@ -86,84 +89,120 @@ def create_quantization_tables():
         for x in range(8):
             for y in range(8):
                 for z in range(1,8):
-                    this_q3_luminance[y,x,z] = np.max([this_q_luminance[y,x],this_q_luminance[y,z],this_q_luminance[z,x]])
-                    this_q3_chrominance[y,x,z] = np.max([this_q_chrominance[y,x],this_q_chrominance[y,z],this_q_chrominance[z,x]])
+                    # this_q3_luminance[y,x,z] = np.max([this_q_luminance[y,x],this_q_luminance[y,z],this_q_luminance[z,x]])
+                    # this_q3_chrominance[y,x,z] = np.max([this_q_chrominance[y,x],this_q_chrominance[y,z],this_q_chrominance[z,x]])
+                    this_q3_luminance[y,x,z] = this_q_luminance[y,x]
+                    this_q3_chrominance[y,x,z] = this_q_chrominance[y,x]
 
         q3_luminance[:,:,:,q] = this_q3_luminance
         q3_chrominance[:,:,:,q] = this_q3_chrominance
 
-    # print("80 luminance")
-    # for i in range(8):
-    #     print(q3_luminance[:,:,i,79])
-    # print("80 chrominance")
-    # for i in range(8):
-    #     print(q3_chrominance[:,:,i,79])
-    #
-    # print("50 luminance")
-    # for i in range(8):
-    #     print(q3_luminance[:,:,i,49])
-    # print("50 chrominance")
-    # for i in range(8):
-    #     print(q3_chrominance[:,:,i,49])
-    #
-    # print("10 luminance")
-    # for i in range(8):
-    #     print(q3_luminance[:,:,i,9])
-    # print("10 chrominance")
-    # for i in range(8):
-    #     print(q3_chrominance[:,:,i,9])
+    return q3_luminance, q3_chrominance
 
 
+luminance_tables, chrominance_tables = create_quantization_tables()
 
 
-
-    # print(q_luminance)
-    # print(q_chrominance)
-    #
-    # Q = 80
-    #
-    # S = 5000/Q if (Q < 50) else 200-2*Q
-    #
-    # print(Q,S)
-    #
-    # q_luminance_80 = np.uint8((S*q_luminance+50)/100)
-    #
-    # print(q_luminance_80)
-    #
-    # Q = 10
-    #
-    # S = 5000/Q if (Q < 50) else 200-2*Q
-    #
-    # print(Q,S)
-    #
-    # q_luminance_10 = np.uint8((S*q_luminance+50)/100)
-    #
-    # print(q_luminance_10)
-
-def process_cube(img, weight, quality, q_tables):
+def process_cube(img, weight, quality):
     # TODO: check to make sure that size of img, and q_tables are consistent
+
+    img = img.copy()
+
+    # print('process_cube input: {}'.format(img))
 
     this_quality = np.round(np.max(weight)*quality)
 
-    if (this_quality < 0):
-        this_quality = 1
-    if (this_quality > quality - 1):
+    if this_quality < 0:
+        this_quality = 0
+    if this_quality > quality - 1:
         this_quality = quality - 1
 
-    img_dct = dct(dct(dct(np.float32(img.copy()),axis=0),axis=1),axis=2)/4096
-    img_dct = np.floor(img_dct / q_tables[:,:,:,this_quality])
+    for i in range(img.shape[3]):
+        img[:, :, :, i] = cv2.cvtColor(img[:, :, :, i], cv2.COLOR_BGR2LAB)
+    img = np.float32(img)
 
-    # print(img_dct)
+    # print('process_cube pre DCT: {}'.format(img))
 
-    img_processed = np.uint8(idct(idct(idct(img_dct*q_tables[:,:,:,this_quality],axis=0),axis=1),axis=2))
+    # img_dct = dct(dct(dct(img, axis=0)/4, axis=1)/4, axis=3)/4
+    img_dct = dct(dct(img, axis=0)/4, axis=1)/4
 
-    # print(img_processed)
+    Q_luma = luminance_tables[:, :, :, this_quality].astype(np.float32)
+    Q_chroma = chrominance_tables[:, :, :, this_quality].astype(np.float32)
 
-    # print(dct(dct(img,axis=1),axis=0))
+    # Q_luma[:, :, :] = .01
+    # Q_chroma[:, :, :] = .01
 
+    # print('Q_luma: {}'.format(Q_luma))
+    # print('Q_chroma: {}'.format(Q_chroma))
+
+    # print('dct, pre rounding: {}'.format(img_dct))
+    img_dct[:, :, 0, :] /= Q_luma
+    img_dct[:, :, 1, :] /= Q_chroma
+    img_dct[:, :, 2, :] /= Q_chroma
+
+    img_dct = np.round(img_dct)
+
+    img_dct[:, :, 0, :] *= Q_luma
+    img_dct[:, :, 1, :] *= Q_chroma
+    img_dct[:, :, 2, :] *= Q_chroma
+    # print('dct, post rounding: {}'.format(img_dct))
+
+    # img_processed = idct(idct(idct(img_dct, axis=0)/4, axis=1)/4, axis=3)/4
+    img_processed = idct(idct(img_dct, axis=0)/4, axis=1)/4
+
+    # print('process_cube post DCT: {}'.format(img_processed))
+
+    img_processed = np.clip(img_processed, 0, 255)
+    img_processed = np.uint8(img_processed)
+
+    for i in range(img.shape[3]):
+        img_processed[:,:,:,i] = cv2.cvtColor(img_processed[:,:,:,i], cv2.COLOR_LAB2BGR)
+
+    # print('process_cube output: {}'.format(img))
+
+    # print('pre dct / post_dct: {}'.format(pre_dct / post_dct))
     return img_processed
 
 
+def process_block(img, weight, quality):
+
+    img = img.copy()
+
+    # print('process_cube input: {}'.format(img))
+
+    this_quality = np.round(np.max(weight)*quality)
+
+    if this_quality < 0:
+        this_quality = 0
+    if this_quality > quality - 1:
+        this_quality = quality - 1
+
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    img = np.float32(img)
+
+    img_dct = dct(dct(img, axis=0)/4, axis=1)/4
+
+    Q_luma = luminance_tables[:, :, :, this_quality][:, :, 0].astype(np.float32)
+    Q_chroma = chrominance_tables[:, :, :, this_quality][:, :, 0].astype(np.float32)
+
+    img_dct[:, :, 0] /= Q_luma
+    img_dct[:, :, 1] /= Q_chroma
+    img_dct[:, :, 2] /= Q_chroma
+
+    img_dct = np.round(img_dct)
+
+    img_dct[:, :, 0] *= Q_luma
+    img_dct[:, :, 1] *= Q_chroma
+    img_dct[:, :, 2] *= Q_chroma
+
+    img_processed = idct(idct(img_dct, axis=0)/4, axis=1)/4
+
+    img_processed = np.clip(img_processed, 0, 255)
+    img_processed = np.uint8(img_processed)
+
+    img_processed = cv2.cvtColor(img_processed, cv2.COLOR_LAB2BGR)
+
+    return img_processed
 
 
 def compression_test(img):
@@ -289,7 +328,7 @@ def combine_weights(W_list):
     return W
 
 
-def calculate_global_weight_matrix(img_left, img_right):
+def calculate_global_weight_matrix(img_left, img_right, show=False):
 
     W = np.zeros((img_left.shape[1], img_left.shape[0]))
 
@@ -305,18 +344,19 @@ def calculate_global_weight_matrix(img_left, img_right):
 
     W = combine_weights([W_triangle, W_disparity])
 
-    plt.figure()
-    plt.subplot(311), plt.imshow(W_triangle, vmin=0, vmax=1)
-    plt.title('W_triangle')
-    plt.subplot(312), plt.imshow(W_disparity, vmin=0, vmax=1)
-    plt.title('W_disparity')
-    plt.subplot(313), plt.imshow(W, vmin=0, vmax=1)
-    plt.title('W')
+    # if show:
+    #     plt.figure()
+    #     plt.subplot(311), plt.imshow(W_triangle, vmin=0, vmax=1)
+    #     plt.title('W_triangle')
+    #     plt.subplot(312), plt.imshow(W_disparity, vmin=0, vmax=1)
+    #     plt.title('W_disparity')
+    #     plt.subplot(313), plt.imshow(W, vmin=0, vmax=1)
+    #     plt.title('W')
 
     return W
 
 
-def process_block(img, weight, quality):
+def process_block_using_imwrite(img, weight, quality):
 
     chroma_quality = np.mean(weight) * quality
     print(chroma_quality)
@@ -341,13 +381,12 @@ def process_block(img, weight, quality):
     return img
 
 
-def process(img_left, img_right):
+def process_image(img_left, img_right, block_size=8):
 
     W = calculate_global_weight_matrix(img_left, img_right)
 
     img = img_left.copy()
 
-    block_size = 8
     for i in range(int(img.shape[0]/block_size) + 1):
         for j in range(int(img.shape[1]/block_size) + 1):
 
@@ -360,16 +399,18 @@ def process(img_left, img_right):
             print('Block {})'.format((i, j)))
 
             if y2 > img.shape[0]:
-                y2 = img.shape[0]
+                # y2 = img.shape[0]
+                continue
             if x2 > img.shape[1]:
-                x2 = img.shape[1]
+                # x2 = img.shape[1]
+                continue
 
             block = process_block(img[y1:y2, x1:x2, :], W[y1:y2, x1:x2], quality=10)
 
             img[y1:y2, x1:x2, :] = block
 
-    img = img[0:int(img.shape[0]/block_size)*block_size, 0:int(img.shape[1]/block_size)*block_size, :]
-    print(img.shape)
+    # img = img[0:int(img.shape[0]/block_size)*block_size, 0:int(img.shape[1]/block_size)*block_size, :]
+
     # smoothed_img = cv2.GaussianBlur(img, (5, 5), 0)
     # img[:, :, 0] = W * img[:, :, 0] + (1 - W) * smoothed_img[:, :, 0]
     # img[:, :, 1] = W * img[:, :, 1] + (1 - W) * smoothed_img[:, :, 1]
@@ -410,7 +451,7 @@ def main(show=False):
     # Process (compress)
     print('')
     print('Running smart compression...')
-    img_out = process(img_left, img_right)
+    img_out = process_image(img_left, img_right)
 
     # Save the data as an array
     # import pickle
@@ -442,13 +483,13 @@ def main(show=False):
     ))
 
     # Show the output image
-    if show:
-        plt.figure()
-        plt.subplot(211), plt.imshow(cv2.cvtColor(img_left, cv2.COLOR_BGR2RGB))
-        plt.title('Original')
-        plt.subplot(212), plt.imshow(cv2.cvtColor(img_out, cv2.COLOR_BGR2RGB))
-        plt.title('Compressed')
-        plt.show()
+    # if show:
+    #     plt.figure()
+    #     plt.subplot(211), plt.imshow(cv2.cvtColor(img_left, cv2.COLOR_BGR2RGB))
+    #     plt.title('Original')
+    #     plt.subplot(212), plt.imshow(cv2.cvtColor(img_out, cv2.COLOR_BGR2RGB))
+    #     plt.title('Compressed')
+    #     plt.show()
 
     # Compute the compression
     in_size = os.stat(in_path).st_size

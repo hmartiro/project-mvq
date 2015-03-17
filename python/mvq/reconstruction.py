@@ -14,7 +14,7 @@ from mvq.filters.lane_marker import lane_marker_filter
 from mvq.detectors.ransac_vanishing_point import ransac_vanishing_point_detection
 
 
-def find_vanishing_point(img):
+def find_vanishing_point(img, show=False):
     """
     Calculate the vanishing point of the road markers.
 
@@ -60,12 +60,13 @@ def find_vanishing_point(img):
     # Plot the vanishing point
     cv2.circle(img_copy, vanishing_point, 1, (255, 0, 0), 20)
 
-    # Plot
-    plt.figure()
-    plt.subplot(211), plt.imshow(img_copy, 'gray')
-    plt.title('Input image with Hough lines and vanishing point')
-    plt.subplot(212), plt.imshow(filtered_img, 'gray')
-    plt.title('Lane marker detection filter')
+    if show:
+        # Plot
+        plt.figure()
+        plt.subplot(211), plt.imshow(img_copy, 'gray')
+        plt.title('Input image with Hough lines and vanishing point')
+        plt.subplot(212), plt.imshow(filtered_img, 'gray')
+        plt.title('Lane marker detection filter')
 
     return vanishing_point
 
