@@ -46,7 +46,7 @@ def process_image_block(left_images, right_images):
             y2 = (i+1) * block_size
             x2 = (j+1) * block_size
 
-            print('Block {})'.format((i, j)))
+            # print('Block {})'.format((i, j)))
 
             if y2 > out_3d.shape[0]:
                 # y2 = out_3d.shape[0]
@@ -113,34 +113,43 @@ def process(left_image_paths, right_image_paths, out_dir):
     fps = 10
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
 
-    out = cv2.VideoWriter(
-        filename=str(out_dir / 'output.avi'),
-        fourcc=fourcc,
-        fps=fps,
-        frameSize=frame_size
-    )
+    # out = cv2.VideoWriter(
+    #     filename=str(out_dir / 'output.avi'),
+    #     fourcc=fourcc,
+    #     fps=fps,
+    #     frameSize=frame_size
+    # )
+    #
+    # out_orig = cv2.VideoWriter(
+    #     filename=str(out_dir / 'output_orig.avi'),
+    #     fourcc=fourcc,
+    #     fps=fps,
+    #     frameSize=frame_size
+    # )
 
-    out_orig = cv2.VideoWriter(
-        filename=str(out_dir / 'output_orig.avi'),
-        fourcc=fourcc,
-        fps=fps,
-        frameSize=frame_size
-    )
+    # N = 64
 
     for i in range(N):
+
+        print(i)
 
         left_image = cv2.imread(left_image_paths[i], cv2.IMREAD_COLOR)
         right_image = cv2.imread(right_image_paths[i], cv2.IMREAD_COLOR)
 
-        out_image = process_image(left_image, right_image)
+        out_image = np.uint8(process_image(left_image, right_image))
 
-        out.write(out_image)
-        out_orig.write(left_image)
+        out_path = str(out_dir / left_image_paths[i][-14:])
+        cv2.imwrite(out_path, out_image)
 
-        cv2.imshow('video', out_image)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        # out.write(out_image)
+        # out_orig.write(left_image)
+        #
+        # cv2.imshow('video', out_image)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
 
+    # block_size = 8
+    #
     # for block in range(int(N/block_size)):
     #
     #     left_images = []
@@ -161,7 +170,7 @@ def process(left_image_paths, right_image_paths, out_dir):
     #
     #         image_names.append(left_image_paths[i][-14:])
     #
-    #         out_orig.write(left_image)
+    #         # out_orig.write(left_image)
     #
     #     out_images = process_image_block(left_images, right_images)
     #
@@ -173,17 +182,17 @@ def process(left_image_paths, right_image_paths, out_dir):
     #         out_path = str(out_dir / image_path)
     #         cv2.imwrite(out_path, out_image)
     #
-    #         out.write(out_image)
+    #         # out.write(out_image)
     #
-    #         cv2.imshow('video', out_image)
-    #         if cv2.waitKey(1) & 0xFF == ord('q'):
-    #             break
+    #         # cv2.imshow('video', out_image)
+    #         # if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         #     break
     #
     #         out_images.append(out_image)
 
-    out.release()
-    out_orig.release()
-    cv2.destroyAllWindows()
+    # out.release()
+    # out_orig.release()
+    # cv2.destroyAllWindows()
 
 
 def main():
@@ -199,9 +208,9 @@ def main():
     right_image_paths = list(str(x) for x in (p / 'right').glob('*.png'))
     right_image_paths.sort()
 
-    out_path = p / 'out'
+    out_path = p / 'justdct_quality20'
 
-    num_images = 16
+    num_images = 5
 
     process(left_image_paths[:num_images], right_image_paths[:num_images], out_path)
 

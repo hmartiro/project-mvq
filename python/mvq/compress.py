@@ -332,7 +332,7 @@ def calculate_global_weight_matrix(img_left, img_right, show=False):
 
     W = np.zeros((img_left.shape[1], img_left.shape[0]))
 
-    W_triangle = reconstruction.find_holy_triangle(img_left, -100, 850) + 0.02
+    W_triangle = reconstruction.find_holy_triangle(img_left, -100, 850)*0.7 + 0.02
     W_triangle = cv2.GaussianBlur(W_triangle, (101, 101), 0)
 
     W_disparity = calculate_disparity_map(img_left, img_right)
@@ -387,6 +387,8 @@ def process_image(img_left, img_right, block_size=8):
 
     img = img_left.copy()
 
+    # img = cv2.bilateralFilter(img, 50, 75, 75)
+    #
     for i in range(int(img.shape[0]/block_size) + 1):
         for j in range(int(img.shape[1]/block_size) + 1):
 
@@ -396,7 +398,7 @@ def process_image(img_left, img_right, block_size=8):
             y2 = (i+1) * block_size
             x2 = (j+1) * block_size
 
-            print('Block {})'.format((i, j)))
+            # print('Block {})'.format((i, j)))
 
             if y2 > img.shape[0]:
                 # y2 = img.shape[0]
@@ -405,7 +407,7 @@ def process_image(img_left, img_right, block_size=8):
                 # x2 = img.shape[1]
                 continue
 
-            block = process_block(img[y1:y2, x1:x2, :], W[y1:y2, x1:x2], quality=10)
+            block = process_block(img[y1:y2, x1:x2, :], W[y1:y2, x1:x2], quality=20)
 
             img[y1:y2, x1:x2, :] = block
 

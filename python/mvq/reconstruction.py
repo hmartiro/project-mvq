@@ -55,6 +55,11 @@ def find_vanishing_point(img, show=False):
         cv2.line(img_copy, p1, p2, (255, 255, 0), 2)
 
     vanishing_point = ransac_vanishing_point_detection(lines, 5, 20)
+
+    if vanishing_point is None:
+        vanishing_point = 650, 175
+
+    vanishing_point = vanishing_point[0], (vanishing_point[1] - 50)
     print(vanishing_point)
 
     # Plot the vanishing point
